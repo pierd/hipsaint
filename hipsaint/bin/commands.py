@@ -40,6 +40,11 @@ def main():
                       dest="notify",
                       help="Whether or not this message should trigger a notification for people in the room")
 
+    parser.add_option("-m", "--mention",
+                      action="append",
+                      dest="mention",
+                      help="Add footer with @mentions (can be provided multiple times)")
+
     ### Parse command line
     (options, args) = parser.parse_args()
     ### Validate required input

@@ -14,13 +14,14 @@ class HipchatMessage(object):
     url = "https://api.hipchat.com/v1/rooms/message"
     default_color = 'red'
 
-    def __init__(self, type, inputs, token, user, room_id, notify, **kwargs):
+    def __init__(self, type, inputs, token, user, room_id, notify, mention=None, **kwargs):
         self.type = type
         self.inputs = inputs
         self.token = token
         self.user = user
         self.room_id = room_id
         self.notify = notify
+        self.mention = mention
 
     def deliver_payload(self, **kwargs):
         """ Makes HTTP GET request to HipChat containing the message from nagios
@@ -34,16 +35,33 @@ class HipchatMessage(object):
                    'notify': int(self.notify),
                    'auth_token': self.token}
         message.update(kwargs)
-        raw_response = requests.get(self.url, params=message)
+        sent, raw_response = self.send_message(message)
+        if sent and self.mention:
+            footer_body = ' '.join('@%s' % m for m in self.mention)
+            footer = {'room_id': self.room_id,
+                      'from': self.user,
+                      'message': footer_body,
+                      'color': self.message_color,
+                      'notify': int(self.notify),
+                      'auth_token': self.token,
+                      'message_format': 'text'}
+            self.send_message(footer)
+        return raw_response
+
+    def send_message(self, message_params):
+        raw_response = requests.get(self.url, params=message_params)
         response_data = raw_response.json()
+        result = True
         if 'error' in response_data:
             error_message = response_data['error'].get('message')
             error_type = response_data['error'].get('type')
             error_code = response_data['error'].get('code')
             log.error('%s - %s: %s', error_code, error_type, error_message)
+            result = False
         elif not 'status' in response_data:
             log.error('Unexpected response')
-        return raw_response
+            result = False
+        return result, raw_response
 
     def render_message(self):
         """ Unpacks Nagios inputs and renders the appropriate template depending
